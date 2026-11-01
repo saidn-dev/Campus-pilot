@@ -23,10 +23,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Turn on demo mode
+      # with the repo variable API_BASE_URL set (e.g. https://campus-pilot.onrender.com) the page
+      # calls that server; without it the page runs in demo mode with sample data
+      - name: Point the page at the API, or turn on demo mode
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
         run: |
-          sed -i 's|<head>|<head><meta name="demo-mode" content="on">|' web/index.html
-          grep -q 'name="demo-mode"' web/index.html
+          if [ -n "$API_BASE_URL" ]; then
+            tag="<meta name=\"api-base\" content=\"$API_BASE_URL\">"
+          else
+            tag='<meta name="demo-mode" content="on">'
+          fi
+          sed -i "s|<head>|<head>$tag|" web/index.html
+          grep -q 'name="api-base"\|name="demo-mode"' web/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web

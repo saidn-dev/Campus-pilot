@@ -4,6 +4,9 @@ const STORE_KEY = "campus-pilot:classes";
 const OLD_STORE_KEY = "timetable-assistant";
 const TYPES = ["Lecture", "Lab", "Tutorial", "Other"];
 
+// set by the Pages build when the backend is hosted elsewhere (e.g. on Render); empty = same server
+const API_BASE = (document.querySelector('meta[name="api-base"]')?.content || "").replace(/\/$/, "");
+
 let classes = load();
 let imageFile = null;
 
@@ -31,6 +34,26 @@ function setStatus(el, text, isError = false) {
   el.textContent = text;
   el.classList.toggle("error", isError);
 }
+
+// ---------- server calls ----------
+
+async function api(path, options, fallback) {
+  let res;
+  try {
+    res = await fetch(API_BASE + path, { method: "POST", ...options });
+  } catch {
+    throw new Error(API_BASE
+      ? "Couldn't reach the server. After a quiet spell it takes up to a minute to wake up, so try again shortly."
+      : "Couldn't reach the server. Is it still running?");
+  }
+  let data = {};
+  try { data = await res.json(); } catch {}
+  if (!res.ok) throw new Error(data.detail || fallback);
+  return data;
+}
+
+// a free host sleeps when idle; start waking it while the visitor picks a photo
+if (API_BASE) fetch(API_BASE + "/api/health").catch(() => {});
 
 // ---------- image upload ----------
 
@@ -68,13 +91,11 @@ async function readTimetable() {
     return setStatus($("read-status"), "The live demo has no AI server, so it can't read photos. Use \"Try a sample timetable\" or add classes by hand, or run it locally to read your own timetable.", true);
   }
   $("read-btn").disabled = true;
-  setStatus($("read-status"), "Gemma 4 is reading your timetable. This can take 20-60 seconds...");
+  setStatus($("read-status"), "Gemma 4 is reading your timetable. This can take 20-60 seconds" + (API_BASE ? ", plus up to a minute if the server was asleep..." : "..."));
   try {
     const form = new FormData();
     form.append("image", await shrinkImage(imageFile), "timetable.jpg");
-    const res = await fetch("/api/extract", { method: "POST", body: form });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "Reading failed.");
+    const data = await api("/api/extract", { body: form }, "Reading failed.");
     if (!data.classes.length) throw new Error("Gemma could not find any classes in that image. Try a clearer photo.");
     classes = data.classes.map(c => ({ ...c, id: newId() }));
     save();
@@ -246,13 +267,10 @@ async function getTips() {
     if (DEMO) {
       data = { tips: demoTips(classes) };
     } else {
-      const res = await fetch("/api/tips", {
-        method: "POST",
+      data = await api("/api/tips", {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ analysis }),
-      });
-      data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Could not get tips.");
+      }, "Could not get tips.");
     }
     $("tips").innerHTML = data.tips.map(t => `<li><b>${esc(t.title)}</b>${esc(t.detail)}</li>`).join("");
     setStatus($("tips-status"), "");
