@@ -1,6 +1,14 @@
 # Timetable Assistant
 
-Turn a photo of your university timetable into an editable class list, catch clashes, and export it to your calendar.
+Turn a photo of your university timetable into an editable class list, catch clashes, and export it to your Google calendar so users get notifications.
+
+ Many universities in Uganda still manage timetables manually using spreadsheets and paperwork.
+This leads to:
+•Lecturer conflicts
+•Room allocation clashes
+•Time-consuming timetable generation
+•Frequent timetable changes
+•Student confusion"
 
 **Live demo:** https://saidn-dev.github.io/campus-pilot/ (it can't read photos and tips come from simple rules, so run it locally for real Gemma 4 results; add `?demo` to a local URL to try demo mode)
 
@@ -96,5 +104,6 @@ The server also serves `web/` at `/`.
 | `POST /api/tips` | `{"analysis": {...}}` | `{"tips": [{"title", "detail"}]}` |
 
 Gemma errors return HTTP 502 with a readable message, such as a missing API key or a timeout.
+Thanks
 
 <!-- TODO: add a License section once a LICENSE file is chosen -->
