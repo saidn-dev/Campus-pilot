@@ -23,6 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Turn on demo mode
+        run: |
+          sed -i 's|<head>|<head><meta name="demo-mode" content="on">|' web/index.html
+          grep -q 'name="demo-mode"' web/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web

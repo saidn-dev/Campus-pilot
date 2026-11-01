@@ -28,9 +28,9 @@ function findConflicts(classes) {
   const issues = [];
 
   classes.forEach(c => {
-    if (!DAYS.includes(c.day)) issues.push({ level: "error", ids: [c.id], text: `${label(c)} has no day set.` });
-    else if (toMin(c.start) === null || toMin(c.end) === null) issues.push({ level: "error", ids: [c.id], text: `${label(c)} on ${c.day} is missing a start or end time.` });
-    else if (toMin(c.end) <= toMin(c.start)) issues.push({ level: "error", ids: [c.id], text: `${label(c)} on ${c.day} ends before it starts (${c.start}-${c.end}).` });
+    if (!DAYS.includes(c.day)) issues.push({ level: "error", kind: "invalid", ids: [c.id], text: `${label(c)} has no day set.` });
+    else if (toMin(c.start) === null || toMin(c.end) === null) issues.push({ level: "error", kind: "invalid", day: c.day, ids: [c.id], text: `${label(c)} on ${c.day} is missing a start or end time.` });
+    else if (toMin(c.end) <= toMin(c.start)) issues.push({ level: "error", kind: "invalid", day: c.day, ids: [c.id], text: `${label(c)} on ${c.day} ends before it starts (${c.start}-${c.end}).` });
   });
 
   const ok = validClasses(classes);
@@ -43,8 +43,8 @@ function findConflicts(classes) {
         if (toMin(b.start) >= toMin(a.end)) break;
         const same = a.code && a.code === b.code && a.start === b.start && a.end === b.end;
         issues.push(same
-          ? { level: "warn", ids: [a.id, b.id], text: `${label(a)} is listed twice on ${day} at ${a.start}.` }
-          : { level: "clash", ids: [a.id, b.id], text: `${label(a)} (${a.start}-${a.end}) clashes with ${label(b)} (${b.start}-${b.end}) on ${day}.` });
+          ? { level: "warn", kind: "duplicate", day, ids: [a.id, b.id], text: `${label(a)} is listed twice on ${day} at ${a.start}.` }
+          : { level: "clash", kind: "clash", day, ids: [a.id, b.id], text: `${label(a)} (${a.start}-${a.end}) clashes with ${label(b)} (${b.start}-${b.end}) on ${day}.` });
       }
     }
 
@@ -52,7 +52,10 @@ function findConflicts(classes) {
       const a = list[i], b = list[i + 1];
       const gap = toMin(b.start) - toMin(a.end);
       if (gap >= 0 && gap < TIGHT_GAP_MIN && a.room && b.room && a.room !== b.room) {
-        issues.push({ level: "warn", ids: [a.id, b.id], text: `Only ${gap} min to get from ${a.room} to ${b.room} on ${day} (${label(a)} to ${label(b)}).` });
+        const text = gap === 0
+          ? `No time to get from ${a.room} to ${b.room} on ${day}: ${label(a)} ends at ${a.end} and ${label(b)} starts straight after.`
+          : `Only ${gap} min to get from ${a.room} to ${b.room} on ${day} (${label(a)} to ${label(b)}).`;
+        issues.push({ level: "warn", kind: "tight", day, ids: [a.id, b.id], text });
       }
     }
 
@@ -65,7 +68,7 @@ function findConflicts(classes) {
     checkRun();
     function checkRun() {
       if (runStart !== null && runEnd - runStart >= LONG_STRETCH_MIN) {
-        issues.push({ level: "warn", ids: runIds, text: `${day}: ${((runEnd - runStart) / 60).toFixed(1)}h of classes in a row (${toTime(runStart)}-${toTime(runEnd)}) with no real break.` });
+        issues.push({ level: "warn", kind: "long", day, ids: runIds, text: `${day}: ${((runEnd - runStart) / 60).toFixed(1)}h of classes in a row (${toTime(runStart)}-${toTime(runEnd)}) with no real break.` });
       }
     }
   });

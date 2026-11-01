@@ -2,7 +2,7 @@
 
 Turn a photo of your university timetable into an editable class list, catch clashes, and export it to your calendar.
 
-**Live demo:** https://saidn-dev.github.io/campus-pilot/ (sample data stands in for the AI; run it locally for real Gemma 4 results)
+**Live demo:** https://saidn-dev.github.io/campus-pilot/ (it can't read photos and tips come from simple rules, so run it locally for real Gemma 4 results; add `?demo` to a local URL to try demo mode)
 
 Gemma 4 reads the image and writes study tips. Plain rules in the browser handle conflict detection, so those results are exact.
 
@@ -46,7 +46,10 @@ photo ──► /api/extract (Gemma 4) ──► editable table ──► confli
 
 **Prerequisites:** Python 3 and a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
 
-<!-- TODO: add the clone command once the GitHub remote exists -->
+```bash
+git clone https://github.com/saidn-dev/campus-pilot.git
+cd campus-pilot
+```
 
 ```bash
 python -m venv .venv

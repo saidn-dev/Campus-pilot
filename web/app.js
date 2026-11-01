@@ -1,12 +1,18 @@
 const $ = id => document.getElementById(id);
-const STORE_KEY = "timetable-assistant";
+// namespaced: every project page on saidn-dev.github.io shares one origin, so one localStorage
+const STORE_KEY = "campus-pilot:classes";
+const OLD_STORE_KEY = "timetable-assistant";
 const TYPES = ["Lecture", "Lab", "Tutorial", "Other"];
 
 let classes = load();
 let imageFile = null;
 
 function load() {
-  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { return []; }
+  try {
+    const raw = localStorage.getItem(STORE_KEY) ?? localStorage.getItem(OLD_STORE_KEY);
+    localStorage.removeItem(OLD_STORE_KEY);
+    return JSON.parse(raw) || [];
+  } catch { return []; }
 }
 
 function save() {
@@ -58,19 +64,17 @@ function shrinkImage(file, maxSide = 2000) {
 
 async function readTimetable() {
   if (!imageFile) return;
+  if (DEMO) {
+    return setStatus($("read-status"), "The live demo has no AI server, so it can't read photos. Use \"Try a sample timetable\" or add classes by hand, or run it locally to read your own timetable.", true);
+  }
   $("read-btn").disabled = true;
   setStatus($("read-status"), "Gemma 4 is reading your timetable. This can take 20-60 seconds...");
   try {
-    let data;
-    if (DEMO) {
-      data = { classes: await demoExtract() };
-    } else {
-      const form = new FormData();
-      form.append("image", await shrinkImage(imageFile), "timetable.jpg");
-      const res = await fetch("/api/extract", { method: "POST", body: form });
-      data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Reading failed.");
-    }
+    const form = new FormData();
+    form.append("image", await shrinkImage(imageFile), "timetable.jpg");
+    const res = await fetch("/api/extract", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Reading failed.");
     if (!data.classes.length) throw new Error("Gemma could not find any classes in that image. Try a clearer photo.");
     classes = data.classes.map(c => ({ ...c, id: newId() }));
     save();
@@ -230,7 +234,7 @@ function renderRows(clashIds) {
 async function getTips() {
   $("tips-btn").disabled = true;
   $("tips").innerHTML = "";
-  setStatus($("tips-status"), "Gemma 4 is thinking about your week...");
+  setStatus($("tips-status"), DEMO ? "" : "Gemma 4 is thinking about your week...");
   const analysis = {
     classes: classes.map(({ id, ...c }) => c),
     problems: findConflicts(classes).map(i => `${i.level}: ${i.text}`),
@@ -240,7 +244,7 @@ async function getTips() {
   try {
     let data;
     if (DEMO) {
-      data = { tips: await demoTips() };
+      data = { tips: demoTips(classes) };
     } else {
       const res = await fetch("/api/tips", {
         method: "POST",
@@ -305,14 +309,13 @@ $("rows").addEventListener("click", e => {
 if (DEMO) {
   $("demo-banner").hidden = false;
   $("sample-btn").hidden = false;
-  $("sample-btn").addEventListener("click", async () => {
-    $("sample-btn").disabled = true;
-    setStatus($("read-status"), "Loading the sample timetable...");
-    classes = (await demoExtract()).map(c => ({ ...c, id: newId() }));
+  $("sample-btn").addEventListener("click", () => {
+    if (classes.length && !confirm("Replace your current classes with the sample timetable?")) return;
+    classes = demoSample().map(c => ({ ...c, id: newId() }));
     save();
     render();
-    setStatus($("read-status"), `Loaded ${classes.length} sample classes. Edit them to see the checks update.`);
-    $("sample-btn").disabled = false;
+    $("tips").innerHTML = "";
+    setStatus($("read-status"), `Loaded ${classes.length} sample classes. Edit them and the checks and tips update to match.`);
   });
 }
 
