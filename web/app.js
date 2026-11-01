@@ -91,12 +91,12 @@ async function readTimetable() {
     return setStatus($("read-status"), "The live demo has no AI server, so it can't read photos. Use \"Try a sample timetable\" or add classes by hand, or run it locally to read your own timetable.", true);
   }
   $("read-btn").disabled = true;
-  setStatus($("read-status"), "Gemma 4 is reading your timetable. This can take 20-60 seconds" + (API_BASE ? ", plus up to a minute if the server was asleep..." : "..."));
+  setStatus($("read-status"), "Reading your timetable. This usually takes a few seconds" + (API_BASE ? ", plus up to a minute if the server was asleep..." : "..."));
   try {
     const form = new FormData();
     form.append("image", await shrinkImage(imageFile), "timetable.jpg");
     const data = await api("/api/extract", { body: form }, "Reading failed.");
-    if (!data.classes.length) throw new Error("Gemma could not find any classes in that image. Try a clearer photo.");
+    if (!data.classes.length) throw new Error("No classes found in that image. Try a clearer photo.");
     classes = data.classes.map(c => ({ ...c, id: newId() }));
     save();
     render();
@@ -246,7 +246,7 @@ function renderRows(clashIds) {
       <td><input data-f="end" type="time" value="${esc(c.end)}"></td>
       <td><input data-f="room" value="${esc(c.room)}"></td>
       <td><input data-f="lecturer" value="${esc(c.lecturer)}"></td>
-      <td><button class="del" aria-label="Delete class">✕</button></td>
+      <td class="actions"><button class="dup" aria-label="Duplicate class" title="Duplicate">⧉</button><button class="del" aria-label="Delete class" title="Delete">✕</button></td>
     </tr>`).join("") || `<tr><td colspan="9" class="status">No classes yet.</td></tr>`;
 }
 
@@ -295,11 +295,24 @@ $("read-btn").addEventListener("click", readTimetable);
 $("tips-btn").addEventListener("click", getTips);
 $("ics-btn").addEventListener("click", downloadCalendar);
 
-$("add-btn").addEventListener("click", () => {
-  classes.push({ id: newId(), code: "", course: "", type: "Lecture", day: "Mon", start: "09:00", end: "10:00", room: "", lecturer: "" });
+// focus the first field of a row so the user can start typing straight away
+function focusRow(id) {
+  document.querySelector(`#rows tr[data-id="${id}"] input`)?.focus();
+}
+
+function addClass() {
+  // start where the last class ends, same day, so adding several in a row needs fewer edits
+  const last = classes[classes.length - 1];
+  const start = last && toMin(last.end) !== null && toMin(last.end) <= 22 * 60 ? last.end : "09:00";
+  const c = { id: newId(), code: "", course: "", type: "Lecture", day: last?.day || "Mon", start, end: toTime(toMin(start) + 60), room: "", lecturer: "" };
+  classes.push(c);
   save();
   render();
-});
+  focusRow(c.id);
+}
+
+$("add-btn").addEventListener("click", addClass);
+$("add-row-btn").addEventListener("click", addClass);
 
 $("clear-btn").addEventListener("click", () => {
   if (!classes.length || !confirm("Remove all classes?")) return;
@@ -318,14 +331,24 @@ $("rows").addEventListener("change", e => {
 });
 
 $("rows").addEventListener("click", e => {
-  if (!e.target.classList.contains("del")) return;
-  classes = classes.filter(x => x.id !== e.target.closest("tr").dataset.id);
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const id = btn.closest("tr").dataset.id;
+  if (btn.classList.contains("del")) {
+    classes = classes.filter(x => x.id !== id);
+  } else if (btn.classList.contains("dup")) {
+    const i = classes.findIndex(x => x.id === id);
+    const copy = { ...classes[i], id: newId() };
+    classes.splice(i + 1, 0, copy);
+    save();
+    render();
+    return focusRow(copy.id);
+  } else return;
   save();
   render();
 });
 
 if (DEMO) {
-  $("demo-banner").hidden = false;
   $("sample-btn").hidden = false;
   $("sample-btn").addEventListener("click", () => {
     if (classes.length && !confirm("Replace your current classes with the sample timetable?")) return;

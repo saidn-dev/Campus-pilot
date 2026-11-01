@@ -16,7 +16,7 @@ from server import gemma  # noqa: E402  (needs the .env loaded first)
 
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
 
-# Gemma calls per visitor per hour; 0 turns the limit off (the default for local use)
+# AI calls per visitor per hour; 0 turns the limit off (the default for local use)
 RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "0") or 0)
 
 app = FastAPI(title="Timetable Assistant")

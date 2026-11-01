@@ -10,12 +10,12 @@ This leads to:
 •Frequent timetable changes
 •Student confusion"
 
-**Live demo:** https://saidn-dev.github.io/campus-pilot/ (reads photos with Gemma 4 through a free Render server, which can take up to a minute to wake up; without a server it falls back to demo mode with sample data, and adding `?demo` to a local URL turns that on)
+**Live demo:** https://saidn-dev.github.io/Campus-pilot/ (reads photos with AI through a free Render server, which can take up to a minute to wake up; without a server it falls back to demo mode with sample data, and adding `?demo` to a local URL turns that on)
 
-Gemma 4 reads the image and writes study tips. Plain rules in the browser handle conflict detection, so those results are exact.
+Gemini 3.5 Flash-Lite reads the image and Gemma 4 writes study tips. Plain rules in the browser handle conflict detection, so those results are exact.
 
 ```text
-photo ──► /api/extract (Gemma 4) ──► editable table ──► conflict check (analysis.js)
+photo ──► /api/extract (Gemini) ──► editable table ──► conflict check (analysis.js)
                                           │                   │
                                           ▼                   ▼
                                     weekly grid         /api/tips (Gemma 4)
@@ -26,7 +26,7 @@ photo ──► /api/extract (Gemma 4) ──► editable table ──► confli
 
 ## Features
 
-- **Photo to table.** Upload a JPG, PNG, or WebP (max 15 MB). Gemma 4 lists each class with course, code, type, day, start, end, room, and lecturer. You can edit every field.
+- **Photo to table.** Upload a JPG, PNG, or WebP (max 15 MB). Gemini 3.5 Flash-Lite lists each class with course, code, type, day, start, end, room, and lecturer. You can edit every field, add a class with **+ Add class** (it starts where the last one ends), or copy one with the duplicate button next to delete.
 - **Conflict detection.** Rule-based checks in `web/analysis.js` flag:
 
   | Check | Rule |
@@ -48,15 +48,15 @@ photo ──► /api/extract (Gemma 4) ──► editable table ──► confli
 |---|---|
 | Backend: FastAPI, httpx | `server/main.py`, `server/gemma.py` |
 | Frontend: vanilla HTML/CSS/JS | `web/index.html`, `web/styles.css`, `web/app.js`, `web/analysis.js` |
-| Model | `gemma-4-31b-it` through the Gemini API, with `gemma-4-26b-a4b-it` as fallback |
+| Models | Photos: `gemini-3.5-flash-lite` (fallback `gemini-3.5-flash`). Tips: `gemma-4-31b-it` (fallback `gemma-4-26b-a4b-it`). All through the Gemini API |
 
 ## Setup
 
 **Prerequisites:** Python 3 and a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
 
 ```bash
-git clone https://github.com/saidn-dev/campus-pilot.git
-cd campus-pilot
+git clone https://github.com/saidn-dev/Campus-pilot.git
+cd Campus-pilot
 ```
 
 ```bash
@@ -74,7 +74,8 @@ Then set your key in `.env`:
 |---|---|---|
 | `GEMINI_API_KEY` | Yes | Gemini API key |
 | `GEMINI_API_KEY_2` | No | Backup key, used when the first is rate-limited |
-| `GEMMA_MODEL` | No | Main model. Default `gemma-4-31b-it`; `gemma-4-26b-a4b-it` is faster |
+| `GEMMA_MODEL` | No | Model for study tips. Default `gemma-4-31b-it`; `gemma-4-26b-a4b-it` is faster |
+| `VISION_MODEL` | No | Model for reading photos. Default `gemini-3.5-flash-lite`, with `gemini-3.5-flash` as backup. Gemma 4 on the Gemini API rejected images with a 400 error as of November 2026 |
 | `ALLOWED_ORIGINS` | No | Sites allowed to call the API from a browser, comma-separated. Only needed when hosting |
 | `RATE_LIMIT_PER_HOUR` | No | AI requests each visitor can make per hour. `0` (default) means no limit |
 
@@ -106,7 +107,7 @@ The server also serves `web/` at `/`.
 | `POST /api/extract` | multipart form, field `image` | `{"classes": [...]}` |
 | `POST /api/tips` | `{"analysis": {...}}` | `{"tips": [{"title", "detail"}]}` |
 
-Gemma errors return HTTP 502 with a readable message, such as a missing API key or a timeout. Going over `RATE_LIMIT_PER_HOUR` returns 429.
+Model errors return HTTP 502 with a readable message, such as a missing API key or a timeout. Going over `RATE_LIMIT_PER_HOUR` returns 429.
 
 ## Deploy
 

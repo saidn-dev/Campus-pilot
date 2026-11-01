@@ -11,12 +11,10 @@
     <div class="brand">
       <svg class="spark" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f8bff"/><stop offset="1" stop-color="#b06bff"/></linearGradient></defs><path fill="url(#g)" d="M12 0c.6 6.4 5.6 11.4 12 12-6.4.6-11.4 5.6-12 12-.6-6.4-5.6-11.4-12-12C6.4 11.4 11.4 6.4 12 0z"/></svg>
       <h1>Timetable Assistant</h1>
-      <span class="badge">Powered by Gemma 4</span>
+      <span class="badge">Powered by Gemini &amp; Gemma 4</span>
     </div>
-    <p>Snap your uni timetable. Gemma 4 reads it, finds clashes and gives you study tips.</p>
+    <p>Snap your uni timetable. AI reads it, finds clashes and Gemma 4 gives you study tips.</p>
   </header>
-
-  <p class="demo-banner" id="demo-banner" hidden>Live demo: there's no AI server here, so it can't read photos. Load the sample timetable or add classes by hand. Tips come from simple rules instead of Gemma 4. Conflict checks, the weekly grid, editing and the calendar export all work as normal. Run it locally to use Gemma 4 (see the README).</p>
 
   <main>
     <section class="panel" id="upload-panel">
@@ -46,7 +44,7 @@
     </section>
 
     <section class="panel wide">
-      <h2>Classes <small>check what Gemma read and fix anything wrong</small></h2>
+      <h2>Classes <small>check what the AI read and fix anything wrong</small></h2>
       <div class="table-wrap">
         <table>
           <thead>
@@ -55,6 +53,7 @@
           <tbody id="rows"></tbody>
         </table>
       </div>
+      <button id="add-row-btn" class="add-row">+ Add class</button>
     </section>
 
     <section class="panel wide">
@@ -73,8 +72,6 @@
       <ol id="tips"></ol>
     </section>
   </main>
-
-  <footer>Built with Gemma 4 (gemma-4-31b-it) through the Gemini API</footer>
 
   <script src="demo.js"></script>
   <script src="analysis.js"></script>

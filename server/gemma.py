@@ -1,4 +1,4 @@
-"""Talks to Gemma 4 through the Gemini API and cleans up what it sends back."""
+"""Talks to the Gemini API (Gemini for reading photos, Gemma 4 for tips) and cleans up what it sends back."""
 
 import asyncio
 import base64
@@ -39,26 +39,40 @@ class GemmaError(Exception):
     pass
 
 
-def _models():
-    main = os.getenv("GEMMA_MODEL", "gemma-4-31b-it")
-    backup = "gemma-4-26b-a4b-it" if main != "gemma-4-26b-a4b-it" else "gemma-4-31b-it"
+def _with_backup(main, pair):
+    backup = pair[1] if main == pair[0] else pair[0]
     return [main, backup]
 
 
-async def _generate(parts):
+def _tips_models():
+    return _with_backup(os.getenv("GEMMA_MODEL", "").strip() or "gemma-4-31b-it", ("gemma-4-31b-it", "gemma-4-26b-a4b-it"))
+
+
+# Gemma 4 on the Gemini API started rejecting images with "400 Request contains an invalid argument"
+# in early November 2026, so photos go to a Gemini model. Set VISION_MODEL to switch back.
+def _vision_models():
+    return _with_backup(os.getenv("VISION_MODEL", "").strip() or "gemini-3.5-flash-lite", ("gemini-3.5-flash-lite", "gemini-3.5-flash"))
+
+
+def _thinking_level(model):
+    # Gemma accepts "minimal"; some Gemini models reject it but all take "low"
+    return "minimal" if model.startswith("gemma") else "low"
+
+
+async def _generate(parts, models):
     keys = [k.strip() for k in (os.getenv("GEMINI_API_KEY"), os.getenv("GEMINI_API_KEY_2")) if k and k.strip()]
     if not keys:
         raise GemmaError("GEMINI_API_KEY is missing. Add it to the .env file and restart the server.")
 
-    body = {
-        "contents": [{"role": "user", "parts": parts}],
-        # long "thinking" made answers take over 2 minutes; keep it minimal
-        "generationConfig": {"thinkingConfig": {"thinkingLevel": "minimal"}},
-    }
     async with httpx.AsyncClient(timeout=180) as client:
         # when Google is busy (500/503) or a key hits its free limit (429),
         # try the next key, then the backup model
-        for model, key in [(m, k) for m in _models() for k in keys]:
+        for model, key in [(m, k) for m in models for k in keys]:
+            body = {
+                "contents": [{"role": "user", "parts": parts}],
+                # long "thinking" made answers take over 2 minutes; keep it low
+                "generationConfig": {"thinkingConfig": {"thinkingLevel": _thinking_level(model)}},
+            }
             try:
                 res = await client.post(
                     API_URL.format(model=model),
@@ -66,9 +80,9 @@ async def _generate(parts):
                     json=body,
                 )
             except httpx.TimeoutException:
-                raise GemmaError("Gemma took too long to answer. Try again in a moment.")
+                raise GemmaError("The AI model took too long to answer. Try again in a moment.")
             except httpx.HTTPError:
-                raise GemmaError("Could not reach Gemma. Check your internet connection.")
+                raise GemmaError("Could not reach the AI model. Check your internet connection.")
             if res.status_code not in (429, 500, 503):
                 break
             await asyncio.sleep(2)
@@ -76,12 +90,12 @@ async def _generate(parts):
     data = res.json()
     if res.status_code != 200:
         message = data.get("error", {}).get("message", res.text)
-        raise GemmaError(f"Gemma request failed ({res.status_code}): {message}")
+        raise GemmaError(f"AI request to {model} failed ({res.status_code}): {message}")
 
     try:
         out_parts = data["candidates"][0]["content"]["parts"]
     except (KeyError, IndexError):
-        raise GemmaError("Gemma sent back an empty answer. Try again.")
+        raise GemmaError("The AI model sent back an empty answer. Try again.")
 
     # skip "thinking" parts, keep only the final answer text
     return "".join(p.get("text", "") for p in out_parts if not p.get("thought"))
@@ -92,11 +106,11 @@ def parse_json_array(text):
     text = re.sub(r"```(?:json)?", "", text)
     start, end = text.find("["), text.rfind("]")
     if start == -1 or end <= start:
-        raise GemmaError("Gemma did not reply with a list. Try again.")
+        raise GemmaError("The AI model did not reply with a list. Try again.")
     try:
         items = json.loads(text[start : end + 1])
     except json.JSONDecodeError:
-        raise GemmaError("Gemma's reply was not valid JSON. Try again.")
+        raise GemmaError("The AI model's reply was not valid JSON. Try again.")
     return [item for item in items if isinstance(item, dict)]
 
 
@@ -143,12 +157,12 @@ async def extract_classes(image_bytes, mime_type):
         {"inline_data": {"mime_type": mime_type, "data": base64.b64encode(image_bytes).decode()}},
         {"text": EXTRACT_PROMPT},
     ]
-    reply = await _generate(parts)
+    reply = await _generate(parts, _vision_models())
     return [normalize_class(item) for item in parse_json_array(reply)]
 
 
 async def generate_tips(analysis):
-    reply = await _generate([{"text": TIPS_PROMPT + json.dumps(analysis, indent=1)}])
+    reply = await _generate([{"text": TIPS_PROMPT + json.dumps(analysis, indent=1)}], _tips_models())
     tips = []
     for item in parse_json_array(reply):
         title, detail = str(item.get("title", "")).strip(), str(item.get("detail", "")).strip()

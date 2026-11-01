@@ -15,6 +15,8 @@ services:
         sync: false
       - key: GEMMA_MODEL
         value: gemma-4-31b-it
+      - key: VISION_MODEL
+        value: gemini-3.5-flash-lite
       - key: ALLOWED_ORIGINS
         value: https://saidn-dev.github.io
       - key: RATE_LIMIT_PER_HOUR
